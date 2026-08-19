@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>Control de Traspasos · Mini Ya Sabes Qué</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg:#E9EAE4;
+    --paper:#FBFBF9;
+    --ink:#20261D;
+    --ink-soft:#5B5F52;
+    --line:#D9D8CC;
+    --amber:#B7791F;
+    --amber-bg:#F5E9D2;
+    --green:#2F6B4F;
+    --green-bg:#DDEBE3;
+    --rust:#A63D2F;
+    --rust-bg:#F3DEDA;
+    --violet:#6B5CA5;
+    --teal:#2E6E8E;
+    --ochre:#A6763D;
+    --rose:#A34A6B;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'IBM Plex Sans',sans-serif;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .wrap{max-width:480px;margin:0 auto;min-height:100vh;background:var(--bg);padding-bottom:40px;}
+  header.app-header{
+    position:sticky;top:0;z-index:20;
+    background:var(--bg);
+    padding:18px 16px 10px;
+    border-bottom:1px solid var(--line);
+  }
+  .brand{display:flex;align-items:baseline;justify-content:space-between;gap:8px;}
+  .brand h1{
+    font-family:'Barlow Condensed',sans-serif;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:0.04em;
+    font-size:22px;
+    margin:0;
+  }
+  .brand .refresh-btn{
+    background:none;border:1px solid var(--line);border-radius:20px;
+    padding:6px 10px;font-size:12px;color:var(--ink-soft);cursor:pointer;
+    font-family:'IBM Plex Mono',monospace;
+  }
+  .brand .refresh-btn:active{background:var(--paper);}
+  .sync-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);margin-right:5px;vertical-align:middle;opacity:0;transition:opacity 0.3s;}
+  .sync-dot.on{opacity:1;}
+  .subtitle{font-size:11px;color:var(--ink-soft);letter-spacing:0.03em;margin:2px 0 12px;font-family:'IBM Plex Mono',monospace;}
+  .branch-select-row{display:flex;align-items:center;gap:8px;}
+  .branch-select-row label{font-size:12px;color:var(--ink-soft);white-space:nowrap;}
+  select.branch-select{
+    flex:1;
+    font-family:'IBM Plex Sans',sans-serif;
+    font-weight:600;
+    font-size:14px;
+    padding:8px 10px;
+    border-radius:8px;
+    border:1.5px solid var(--ink);
+    background:var(--paper);
+    color:var(--ink);
+  }
+  .tabs{display:flex;gap:6px;margin-top:12px;}
+  .tab-btn{
+    flex:1;
+    font-family:'IBM Plex Sans',sans-serif;
+    font-weight:600;
+    font-size:12.5px;
+    padding:9px 4px;
+    border-radius:8px;
+    border:1.5px solid var(--line);
+    background:var(--paper);
+    color:var(--ink-soft);
+    cursor:pointer;
+    text-align:center;
+    position:relative;
+  }
+  .tab-btn.active{border-color:var(--ink);color:var(--ink);background:#fff;}
+  .tab-badge{
+    display:inline-block;min-width:16px;padding:0 4px;margin-left:4px;
+    background:var(--rust);color:#fff;font-size:10px;font-weight:600;
+    border-radius:8px;font-family:'IBM Plex Mono',monospace;
+  }
+  main{padding:16px;}
+  .gate{
+    padding:40px 20px;text-align:center;color:var(--ink-soft);
+  }
+  .empty-state{
+    padding:36px 20px;text-align:center;color:var(--ink-soft);
+    border:1.5px dashed var(--line);border-radius:12px;font-size:13.5px;
+  }
+  .banner{
+    background:var(--rust-bg);color:var(--rust);border:1px solid var(--rust);
+    border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:12px;
+    display:flex;justify-content:space-between;align-items:center;gap:8px;
+  }
+  .banner button{background:none;border:1px solid var(--rust);color:var(--rust);border-radius:6px;padding:4px 8px;font-size:12px;cursor:pointer;}
+  .loading{padding:40px 0;text-align:center;color:var(--ink-soft);font-family:'IBM Plex Mono',monospace;font-size:13px;}
+
+  /* Form */
+  .field{margin-bottom:16px;}
+  .field label{display:block;font-size:12px;font-weight:600;color:var(--ink-soft);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.03em;}
+  input[type=text], textarea, select.field-select{
+    width:100%;
+    font-family:'IBM Plex Sans',sans-serif;
+    font-size:14.5px;
+    padding:10px 11px;
+    border-radius:8px;
+    border:1.5px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+  }
+  textarea{resize:vertical;min-height:56px;}
+  .item-row{display:flex;gap:8px;margin-bottom:8px;align-items:center;}
+  .item-row input.producto-input{flex:2;}
+  .item-row input.cantidad-input{flex:1;font-family:'IBM Plex Mono',monospace;}
+  .item-row .remove-row{
+    background:none;border:none;color:var(--rust);font-size:18px;cursor:pointer;
+    width:28px;flex-shrink:0;
+  }
+  .add-row-btn{
+    background:none;border:1.5px dashed var(--line);color:var(--ink-soft);
+    border-radius:8px;padding:8px;width:100%;font-size:13px;cursor:pointer;font-weight:600;
+  }
+  .photo-btn{
+    display:flex;align-items:center;gap:8px;justify-content:center;
+    background:var(--paper);border:1.5px solid var(--ink);border-radius:8px;
+    padding:12px;font-size:14px;font-weight:600;cursor:pointer;width:100%;color:var(--ink);
+  }
+  .photo-preview{position:relative;margin-top:10px;display:inline-block;}
+  .photo-preview img{max-width:140px;max-height:140px;border-radius:8px;border:1.5px solid var(--line);display:block;}
+  .photo-preview .remove-photo{
+    position:absolute;top:-8px;right:-8px;background:var(--rust);color:#fff;
+    border:none;border-radius:50%;width:22px;height:22px;font-size:13px;cursor:pointer;
+  }
+  .submit-btn{
+    width:100%;background:var(--ink);color:#fff;border:none;border-radius:9px;
+    padding:14px;font-size:15px;font-weight:600;cursor:pointer;margin-top:6px;
+    font-family:'IBM Plex Sans',sans-serif;
+  }
+  .submit-btn:disabled{opacity:0.5;}
+  .submit-btn:active{opacity:0.85;}
+
+  /* Ticket card */
+  .ticket{
+    position:relative;
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:10px 10px 0 0;
+    padding:14px 14px 18px;
+    margin-bottom:22px;
+    box-shadow:0 1px 2px rgba(0,0,0,0.04);
+  }
+  .ticket::after{
+    content:'';
+    position:absolute;left:0;right:0;bottom:-9px;height:12px;
+    background-image:
+      linear-gradient(-45deg, var(--bg) 6px, transparent 0),
+      linear-gradient(45deg, var(--bg) 6px, transparent 0);
+    background-size:12px 12px;
+    background-position:left bottom;
+    background-repeat:repeat-x;
+  }
+  .ticket-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
+  .ticket-route{font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:var(--ink-soft);display:flex;align-items:center;gap:5px;flex-wrap:wrap;}
+  .branch-dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0;}
+  .ticket-date{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink-soft);margin-top:2px;}
+  .stamp{
+    font-family:'Barlow Condensed',sans-serif;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:0.08em;
+    font-size:12px;
+    padding:4px 10px;
+    border:2px solid currentColor;
+    border-radius:4px;
+    transform:rotate(-6deg);
+    white-space:nowrap;
+    flex-shrink:0;
+  }
+  .stamp.pendiente{color:var(--amber);background:var(--amber-bg);}
+  .stamp.confirmado{color:var(--green);background:var(--green-bg);}
+  .stamp.diferencia{color:var(--rust);background:var(--rust-bg);}
+  .stamp.cancelado{color:var(--ink-soft);background:#E4E3DB;}
+  .ticket-items{margin:12px 0 4px;font-size:13.5px;}
+  .ticket-items div{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px dotted var(--line);}
+  .ticket-items div:last-child{border-bottom:none;}
+  .ticket-items .cant{font-family:'IBM Plex Mono',monospace;color:var(--ink-soft);}
+  .ticket-notes{font-size:12.5px;color:var(--ink-soft);font-style:italic;margin-top:8px;}
+  .ticket-thumb{margin-top:10px;width:64px;height:64px;border-radius:6px;object-fit:cover;border:1px solid var(--line);cursor:pointer;}
+  .ticket-confirm-info{margin-top:10px;font-size:12px;color:var(--ink-soft);border-top:1px solid var(--line);padding-top:8px;}
+  .confirm-btn{
+    margin-top:12px;width:100%;background:var(--green);color:#fff;border:none;
+    border-radius:8px;padding:11px;font-size:14px;font-weight:600;cursor:pointer;
+  }
+  .cancel-ticket-btn{
+    margin-top:8px;width:100%;background:none;color:var(--rust);border:1.5px solid var(--rust);
+    border-radius:8px;padding:10px;font-size:13.5px;font-weight:600;cursor:pointer;
+  }
+
+  /* Filters */
+  .filters{display:flex;gap:8px;margin-bottom:14px;}
+  .filters select{flex:1;font-size:12.5px;padding:7px 8px;border-radius:7px;border:1px solid var(--line);background:var(--paper);}
+
+  /* Modal */
+  .modal-overlay{
+    position:fixed;inset:0;background:rgba(32,38,29,0.55);z-index:100;
+    display:flex;align-items:flex-end;justify-content:center;
+  }
+  .modal-sheet{
+    background:#fff;border-radius:16px 16px 0 0;padding:20px 18px 24px;
+    width:100%;max-width:480px;max-height:88vh;overflow-y:auto;
+  }
+  .modal-sheet h3{font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;letter-spacing:0.03em;font-size:19px;margin:0 0 14px;}
+  .modal-close{background:none;border:none;font-size:20px;color:var(--ink-soft);cursor:pointer;float:right;}
+  .modal-photo-full{width:100%;border-radius:10px;}
+  .checkbox-row{display:flex;align-items:center;gap:8px;margin-bottom:12px;}
+  .checkbox-row input{width:17px;height:17px;}
+  .checkbox-row label{font-size:13.5px;font-weight:500;color:var(--ink);}
+  .modal-actions{display:flex;gap:10px;margin-top:14px;}
+  .modal-actions button{flex:1;padding:11px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;border:none;}
+  .btn-cancel{background:var(--bg);color:var(--ink-soft);border:1px solid var(--line) !important;}
+  .btn-confirm{background:var(--green);color:#fff;}
+  .btn-danger{background:var(--rust);color:#fff;}
+
+  .toast{
+    position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+    background:var(--ink);color:#fff;padding:11px 18px;border-radius:20px;
+    font-size:13.5px;z-index:200;box-shadow:0 4px 14px rgba(0,0,0,0.25);
+    animation:toastIn 0.2s ease-out;
+  }
+  @keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(10px);}to{opacity:1;transform:translateX(-50%) translateY(0);}}
+  .footer-link{
+    display:block;text-align:center;margin-top:24px;font-size:11.5px;color:var(--ink-soft);
+    text-decoration:underline;background:none;border:none;cursor:pointer;width:100%;
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+// ============================================================
+// CONFIGURACIÓN DE SUPABASE — reemplaza estos dos valores con
+// los de tu proyecto: Supabase Dashboard > Project Settings > API
+// ============================================================
+const SUPABASE_URL = 'https://wldaqifjburdlozsfqdi.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_5jd8OiStsvqzCn81zFi0kg_ekAjH070';
+// ============================================================
+
+const TABLE = 'traspasos';
+const PHOTO_BUCKET = 'ticket-photos';
+
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+function sbConfigured(){
+  return SUPABASE_URL.indexOf('TU-PROYECTO') === -1 && SUPABASE_ANON_KEY.indexOf('TU-ANON-KEY') === -1;
+}
+
+const BRANCHES = ['Condesa','Independencia','Justo Sierra','Santa Cruz'];
+const BRANCH_COLORS = {
+  'Condesa':'#6B5CA5',
+  'Independencia':'#2E6E8E',
+  'Justo Sierra':'#A6763D',
+  'Santa Cruz':'#A34A6B'
+};
+
+let state = {
+  currentBranch: null,
+  activeTab: 'nuevo',
+  index: [],
+  loading: true,
+  error: null,
+  photoData: null,
+  photoBusy: false,
+  modalPhoto: null,
+  confirmTarget: null,
+  cancelTarget: null,
+  historyFilterBranch: 'all',
+  historyFilterStatus: 'all',
+  deleteConfirmOpen: false,
+  syncing: false
+};
+
+let pollTimer = null;
+let realtimeChannel = null;
+
+function genId(){
+  return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,7);
+}
+
+function sleep(ms){ return new Promise(res=>setTimeout(res, ms)); }
+
+function fmtDate(iso){
+  try{
+    return new Date(iso).toLocaleString('es-MX',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+  }catch(e){return '';}
+}
+
+function showToast(msg){
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(), 2400);
+}
+
+// ---------- SUPABASE HELPERS ----------
+
+function getPhotoUrl(id){
+  return sb.storage.from(PHOTO_BUCKET).getPublicUrl(id + '.jpg').data.publicUrl;
+}
+
+function dataURLToBlob(dataUrl){
+  const parts = dataUrl.split(',');
+  const mimeMatch = parts[0].match(/:(.*?);/);
+  const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+  const binary = atob(parts[1]);
+  const array = new Uint8Array(binary.length);
+  for(let i=0; i<binary.length; i++) array[i] = binary.charCodeAt(i);
+  return new Blob([array], {type: mime});
+}
+
+function dbRowToRecord(row){
+  return {
+    id: row.id,
+    from: row.from_branch,
+    to: row.to_branch,
+    items: row.items || [],
+    notas: row.notas || '',
+    hasPhoto: !!row.has_photo,
+    status: row.status,
+    createdAt: row.created_at,
+    createdBy: row.created_by,
+    confirmedAt: row.confirmed_at,
+    confirmedBy: row.confirmed_by,
+    confirmNotas: row.confirm_notas,
+    canceledAt: row.canceled_at,
+    canceledBy: row.canceled_by
+  };
+}
+
+// Wraps a Supabase call with automatic retry + backoff, to absorb
+// occasional network hiccups without blocking the person submitting.
+async function withRetry(fn, attempts){
+  attempts = attempts || 3;
+  let lastErr = null;
+  for(let i=0; i<attempts; i++){
+    try{
+      const { data, error } = await fn();
+      if(!error) return data;
+      lastErr = error;
+    }catch(e){
+      lastErr = e;
+    }
+    console.warn('withRetry intento ' + (i+1) + '/' + attempts + ' falló:', lastErr);
+    if(i < attempts - 1) await sleep(400 + Math.random()*500);
+  }
+  throw new Error(lastErr && lastErr.message ? lastErr.message : 'No se pudo completar la operación');
+}
+
+async function loadIndex(){
+  const data = await withRetry(() =>
+    sb.from(TABLE).select('*').order('created_at', {ascending:false})
+  , 2);
+  state.index = (data || []).map(dbRowToRecord);
+  state.error = null;
+}
+
+async function refreshData(){
+  state.loading = true;
+  render();
+  if(!sbConfigured()){
+    state.error = 'Falta configurar Supabase: edita SUPABASE_URL y SUPABASE_ANON_KEY al inicio del archivo con los datos de tu proyecto.';
+    state.loading = false;
+    render();
+    return;
+  }
+  try{
+    await loadIndex();
+  }catch(e){
+    console.error('refreshData error:', e);
+    state.error = 'No se pudo cargar la información: ' + (e && e.message ? e.message : 'error desconocido');
+  }
+  state.loading = false;
+  render();
+}
+
+async function silentRefresh(){
+  if(state.syncing) return;
+  const blockedByForm = state.activeTab === 'nuevo';
+  const blockedByModal = !!(state.modalPhoto || state.confirmTarget || state.cancelTarget || state.deleteConfirmOpen);
+  if(blockedByForm || blockedByModal) return;
+  state.syncing = true;
+  render();
+  try{
+    await loadIndex();
+  }catch(e){ /* ignore silent errors */ }
+  state.syncing = false;
+  render();
+}
+
+function startPolling(){
+  if(pollTimer) return;
+  pollTimer = setInterval(()=>{
+    if(state.currentBranch) silentRefresh();
+  }, 8000);
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.visibilityState === 'visible' && state.currentBranch) silentRefresh();
+  });
+  window.addEventListener('focus', ()=>{
+    if(state.currentBranch) silentRefresh();
+  });
+  // Realtime: refresca al instante cuando cualquier sucursal escribe,
+  // además del respaldo por polling cada 8s.
+  if(!realtimeChannel){
+    realtimeChannel = sb.channel('traspasos-changes')
+      .on('postgres_changes', {event:'*', schema:'public', table:TABLE}, ()=>{
+        if(state.currentBranch) silentRefresh();
+      })
+      .subscribe();
+  }
+}
+
+function compressImage(file){
+  return new Promise((resolve,reject)=>{
+    const reader = new FileReader();
+    reader.onload = (e)=>{
+      const img = new Image();
+      img.onload = ()=>{
+        const maxW = 900;
+        const scale = Math.min(1, maxW/img.width);
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width*scale);
+        canvas.height = Math.round(img.height*scale);
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img,0,0,canvas.width,canvas.height);
+        resolve(canvas.toDataURL('image/jpeg',0.6));
+      };
+      img.onerror = ()=>reject(new Error('No se pudo leer la imagen'));
+      img.src = e.target.result;
+    };
+    reader.onerror = ()=>reject(new Error('No se pudo leer el archivo'));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function handlePhotoInput(input){
+  const file = input.files && input.files[0];
+  if(!file) return;
+  state.photoBusy = true;
+  render();
+  try{
+    const dataUrl = await compressImage(file);
+    state.photoData = dataUrl;
+  }catch(e){
+    showToast('No se pudo procesar la foto');
+  }
+  state.photoBusy = false;
+  render();
+}
+
+function removePhoto(){
+  state.photoData = null;
+  render();
+}
+
+async function submitTraspaso(){
+  if(!state.currentBranch){ showToast('Selecciona primero tu sucursal'); return; }
+  const destinoEl = document.getElementById('destino-select');
+  const notasEl = document.getElementById('notas-input');
+  const destino = destinoEl ? destinoEl.value : '';
+  const notas = notasEl ? notasEl.value.trim() : '';
+
+  if(!destino){ showToast('Elige la sucursal que recibe'); return; }
+
+  const rows = document.querySelectorAll('#items-container .item-row');
+  const items = [];
+  rows.forEach(row=>{
+    const producto = row.querySelector('.producto-input').value.trim();
+    const cantidad = row.querySelector('.cantidad-input').value.trim();
+    if(producto) items.push({producto, cantidad});
+  });
+
+  if(items.length === 0 && !state.photoData){
+    showToast('Agrega al menos un producto o una foto del ticket');
+    return;
+  }
+
+  const submitBtn = document.getElementById('submit-btn');
+  if(submitBtn){ submitBtn.disabled = true; submitBtn.textContent = 'Enviando…'; }
+
+  const id = genId();
+  const record = {
+    id,
+    from: state.currentBranch,
+    to: destino,
+    items,
+    notas,
+    hasPhoto: !!state.photoData,
+    status: 'pendiente',
+    createdAt: new Date().toISOString(),
+    createdBy: state.currentBranch
+  };
+
+  try{
+    if(state.photoData){
+      const blob = dataURLToBlob(state.photoData);
+      await withRetry(() =>
+        sb.storage.from(PHOTO_BUCKET).upload(id + '.jpg', blob, {contentType:'image/jpeg', upsert:true})
+      , 3);
+    }
+    await withRetry(() =>
+      sb.from(TABLE).insert({
+        id: record.id,
+        from_branch: record.from,
+        to_branch: record.to,
+        items: record.items,
+        notas: record.notas,
+        has_photo: record.hasPhoto,
+        status: record.status,
+        created_at: record.createdAt,
+        created_by: record.createdBy
+      })
+    , 3);
+    showToast('Traspaso enviado a ' + destino + ' ✓');
+    state.index.unshift(record);
+    state.photoData = null;
+    render();
+  }catch(e){
+    console.error('submitTraspaso error:', e);
+    showToast('Error al enviar: ' + (e && e.message ? e.message : 'desconocido'));
+    if(submitBtn){ submitBtn.disabled = false; submitBtn.textContent = 'Enviar traspaso'; }
+  }
+}
+
+function addItemRow(){
+  const container = document.getElementById('items-container');
+  const row = document.createElement('div');
+  row.className = 'item-row';
+  row.innerHTML =
+    '<input type="text" class="producto-input" placeholder="Producto">' +
+    '<input type="text" class="cantidad-input" placeholder="Cant.">' +
+    '<button type="button" class="remove-row" onclick="removeItemRow(this)">✕</button>';
+  container.appendChild(row);
+}
+
+function removeItemRow(btn){
+  const container = document.getElementById('items-container');
+  if(container.children.length > 1){
+    btn.closest('.item-row').remove();
+  }else{
+    btn.closest('.item-row').querySelector('.producto-input').value = '';
+    btn.closest('.item-row').querySelector('.cantidad-input').value = '';
+  }
+}
+
+function openPhotoModal(id){
+  state.modalPhoto = {id};
+  render();
+}
+
+function closeModal(){
+  state.modalPhoto = null;
+  state.confirmTarget = null;
+  state.cancelTarget = null;
+  state.deleteConfirmOpen = false;
+  render();
+}
+
+function openConfirmModal(id){
+  state.confirmTarget = id;
+  render();
+}
+
+function openCancelModal(id){
+  state.cancelTarget = id;
+  render();
+}
+
+async function submitCancelacion(){
+  const id = state.cancelTarget;
+  const updates = {
+    status: 'cancelado',
+    canceled_at: new Date().toISOString(),
+    canceled_by: state.currentBranch
+  };
+  try{
+    await withRetry(() => sb.from(TABLE).update(updates).eq('id', id), 3);
+    state.index = state.index.map(t => t.id === id ? Object.assign({}, t, {
+      status:'cancelado', canceledAt: updates.canceled_at, canceledBy: updates.canceled_by
+    }) : t);
+    state.cancelTarget = null;
+    showToast('Traspaso cancelado');
+    render();
+  }catch(e){
+    showToast('No se pudo cancelar: ' + (e && e.message ? e.message : 'intenta de nuevo'));
+  }
+}
+
+async function submitConfirmacion(){
+  const id = state.confirmTarget;
+  const chk = document.getElementById('diferencia-check');
+  const notasEl = document.getElementById('diferencia-notas');
+  const conDiferencia = chk && chk.checked;
+  const notas = notasEl ? notasEl.value.trim() : '';
+
+  if(conDiferencia && !notas){
+    showToast('Describe brevemente la diferencia');
+    return;
+  }
+
+  const updates = {
+    status: conDiferencia ? 'diferencia' : 'confirmado',
+    confirmed_at: new Date().toISOString(),
+    confirmed_by: state.currentBranch,
+    confirm_notas: notas
+  };
+
+  try{
+    await withRetry(() => sb.from(TABLE).update(updates).eq('id', id), 3);
+    state.index = state.index.map(t => t.id === id ? Object.assign({}, t, {
+      status: updates.status, confirmedAt: updates.confirmed_at,
+      confirmedBy: updates.confirmed_by, confirmNotas: updates.confirm_notas
+    }) : t);
+    state.confirmTarget = null;
+    showToast('Traspaso confirmado ✓');
+    render();
+  }catch(e){
+    showToast('No se pudo confirmar: ' + (e && e.message ? e.message : 'intenta de nuevo'));
+  }
+}
+
+async function confirmDeleteAll(){
+  try{
+    const { data: files } = await sb.storage.from(PHOTO_BUCKET).list();
+    if(files && files.length){
+      await sb.storage.from(PHOTO_BUCKET).remove(files.map(f=>f.name));
+    }
+    const { error } = await sb.from(TABLE).delete().neq('id', '__never_matches__');
+    if(error) throw error;
+    state.index = [];
+    state.deleteConfirmOpen = false;
+    showToast('Historial borrado');
+    render();
+  }catch(e){
+    showToast('No se pudo borrar: ' + (e && e.message ? e.message : ''));
+  }
+}
+
+function setTab(tab){
+  state.activeTab = tab;
+  if(tab === 'recibir' || tab === 'historial'){
+    refreshData();
+  }else{
+    render();
+  }
+}
+
+function setBranch(val){
+  state.currentBranch = val || null;
+  render();
+  if(state.currentBranch) startPolling();
+}
+
+function branchDot(name){
+  return '<span class="branch-dot" style="background:' + (BRANCH_COLORS[name]||'#999') + '"></span>';
+}
+
+function renderTicket(t){
+  const stampLabels = {pendiente:'Pendiente', confirmado:'Recibido', diferencia:'Diferencia', cancelado:'Cancelado'};
+  const stampLabel = stampLabels[t.status] || t.status;
+  const itemsHtml = t.items.map(it =>
+    '<div><span>' + escapeHtml(it.producto) + '</span><span class="cant">' + escapeHtml(it.cantidad||'') + '</span></div>'
+  ).join('');
+  let infoHtml = '';
+  if(t.status === 'confirmado' || t.status === 'diferencia'){
+    infoHtml = '<div class="ticket-confirm-info">Confirmado por ' + escapeHtml(t.confirmedBy||'') + ' · ' + fmtDate(t.confirmedAt) + (t.confirmNotas ? '<br>Nota: ' + escapeHtml(t.confirmNotas) : '') + '</div>';
+  }else if(t.status === 'cancelado'){
+    infoHtml = '<div class="ticket-confirm-info">Cancelado por ' + escapeHtml(t.canceledBy||'') + ' · ' + fmtDate(t.canceledAt) + '</div>';
+  }
+  return '<div class="ticket">' +
+    '<div class="ticket-top">' +
+      '<div>' +
+        '<div class="ticket-route">' + branchDot(t.from) + escapeHtml(t.from) + ' &rarr; ' + branchDot(t.to) + escapeHtml(t.to) + '</div>' +
+        '<div class="ticket-date">' + fmtDate(t.createdAt) + '</div>' +
+      '</div>' +
+      '<span class="stamp ' + t.status + '">' + stampLabel + '</span>' +
+    '</div>' +
+    (itemsHtml ? '<div class="ticket-items">' + itemsHtml + '</div>' : '') +
+    (t.notas ? '<div class="ticket-notes">"' + escapeHtml(t.notas) + '"</div>' : '') +
+    (t.hasPhoto ? '<img class="ticket-thumb" src="'+getPhotoUrl(t.id)+'" onclick="openPhotoModal(\'' + t.id + '\')" onerror="this.style.display=\'none\'" alt="Ver foto del ticket" />' : '') +
+    infoHtml +
+    (t.status === 'pendiente' && t.to === state.currentBranch ? '<button class="confirm-btn" onclick="openConfirmModal(\'' + t.id + '\')">Confirmar recibido</button>' : '') +
+    (t.status === 'pendiente' && t.from === state.currentBranch ? '<button class="cancel-ticket-btn" onclick="openCancelModal(\'' + t.id + '\')">Cancelar traspaso</button>' : '') +
+    '</div>';
+}
+
+function escapeHtml(s){
+  const d = document.createElement('div');
+  d.textContent = s || '';
+  return d.innerHTML;
+}
+
+function renderHeader(){
+  const pendCount = state.currentBranch ? state.index.filter(t=>t.to===state.currentBranch && t.status==='pendiente').length : 0;
+  return '<header class="app-header">' +
+    '<div class="brand"><h1><span class="sync-dot ' + (state.syncing?'on':'') + '"></span>Traspasos · Mini YSQ</h1>' +
+      '<button class="refresh-btn" onclick="refreshData()">↻ Actualizar</button>' +
+    '</div>' +
+    '<div class="subtitle">4 sucursales · Mexicali</div>' +
+    '<div class="branch-select-row">' +
+      '<label>Entras como:</label>' +
+      '<select class="branch-select" onchange="setBranch(this.value)">' +
+        '<option value="">Selecciona sucursal…</option>' +
+        BRANCHES.map(b => '<option value="'+b+'" ' + (state.currentBranch===b?'selected':'') + '>'+b+'</option>').join('') +
+      '</select>' +
+    '</div>' +
+    (state.currentBranch ? (
+      '<div class="tabs">' +
+        '<button class="tab-btn ' + (state.activeTab==='nuevo'?'active':'') + '" onclick="setTab(\'nuevo\')">Nuevo</button>' +
+        '<button class="tab-btn ' + (state.activeTab==='recibir'?'active':'') + '" onclick="setTab(\'recibir\')">Por recibir' + (pendCount>0?' <span class="tab-badge">'+pendCount+'</span>':'') + '</button>' +
+        '<button class="tab-btn ' + (state.activeTab==='historial'?'active':'') + '" onclick="setTab(\'historial\')">Historial</button>' +
+      '</div>'
+    ) : '') +
+  '</header>';
+}
+
+function renderNuevoTab(){
+  const otherBranches = BRANCHES.filter(b => b !== state.currentBranch);
+  return '<div>' +
+    '<div class="field">' +
+      '<label>Sucursal que recibe</label>' +
+      '<select class="field-select" id="destino-select">' +
+        '<option value="">Selecciona…</option>' +
+        otherBranches.map(b=>'<option value="'+b+'">'+b+'</option>').join('') +
+      '</select>' +
+    '</div>' +
+    '<div class="field">' +
+      '<label>Productos</label>' +
+      '<div id="items-container">' +
+        '<div class="item-row">' +
+          '<input type="text" class="producto-input" placeholder="Producto">' +
+          '<input type="text" class="cantidad-input" placeholder="Cant.">' +
+          '<button type="button" class="remove-row" onclick="removeItemRow(this)">✕</button>' +
+        '</div>' +
+      '</div>' +
+      '<button type="button" class="add-row-btn" onclick="addItemRow()">+ Agregar producto</button>' +
+    '</div>' +
+    '<div class="field">' +
+      '<label>Foto del ticket</label>' +
+      (state.photoData ?
+        '<div class="photo-preview"><img src="'+state.photoData+'"><button class="remove-photo" onclick="removePhoto()">✕</button></div>' :
+        '<button type="button" class="photo-btn" onclick="document.getElementById(\'photo-input\').click()">' + (state.photoBusy ? 'Procesando…' : '📷 Tomar / subir foto') + '</button>'
+      ) +
+      '<input type="file" id="photo-input" accept="image/*" capture="environment" style="display:none" onchange="handlePhotoInput(this)">' +
+    '</div>' +
+    '<div class="field">' +
+      '<label>Notas (opcional)</label>' +
+      '<textarea id="notas-input" placeholder="Ej. va incompleto, faltan 2 cajas de..."></textarea>' +
+    '</div>' +
+    '<button class="submit-btn" id="submit-btn" onclick="submitTraspaso()">Enviar traspaso</button>' +
+  '</div>';
+}
+
+function renderRecibirTab(){
+  if(state.loading) return '<div class="loading">Cargando…</div>';
+  const pend = state.index.filter(t=>t.to===state.currentBranch && t.status==='pendiente')
+    .sort((a,b)=> new Date(b.createdAt)-new Date(a.createdAt));
+  if(pend.length===0){
+    return '<div class="empty-state">No tienes traspasos pendientes por recibir.</div>';
+  }
+  return pend.map(renderTicket).join('');
+}
+
+function renderHistorialTab(){
+  if(state.loading) return '<div class="loading">Cargando…</div>';
+  let list = state.index.slice().sort((a,b)=> new Date(b.createdAt)-new Date(a.createdAt));
+  if(state.historyFilterBranch !== 'all'){
+    list = list.filter(t => t.from === state.historyFilterBranch || t.to === state.historyFilterBranch);
+  }
+  if(state.historyFilterStatus !== 'all'){
+    list = list.filter(t => t.status === state.historyFilterStatus);
+  }
+  const filters = '<div class="filters">' +
+    '<select onchange="state.historyFilterBranch=this.value; render()">' +
+      '<option value="all">Todas las sucursales</option>' +
+      BRANCHES.map(b=>'<option value="'+b+'" '+(state.historyFilterBranch===b?'selected':'')+'>'+b+'</option>').join('') +
+    '</select>' +
+    '<select onchange="state.historyFilterStatus=this.value; render()">' +
+      '<option value="all">Todos los estados</option>' +
+      '<option value="pendiente" '+(state.historyFilterStatus==='pendiente'?'selected':'')+'>Pendiente</option>' +
+      '<option value="confirmado" '+(state.historyFilterStatus==='confirmado'?'selected':'')+'>Recibido</option>' +
+      '<option value="diferencia" '+(state.historyFilterStatus==='diferencia'?'selected':'')+'>Diferencia</option>' +
+      '<option value="cancelado" '+(state.historyFilterStatus==='cancelado'?'selected':'')+'>Cancelado</option>' +
+    '</select>' +
+  '</div>';
+  const body = list.length===0
+    ? '<div class="empty-state">No hay traspasos con ese filtro.</div>'
+    : list.map(renderTicket).join('');
+  return filters + body +
+    '<button class="footer-link" onclick="state.deleteConfirmOpen=true; render()">Borrar todo el historial (todas las sucursales)</button>';
+}
+
+function renderModals(){
+  let html = '';
+  if(state.modalPhoto){
+    html += '<div class="modal-overlay" onclick="if(event.target===this) closeModal()">' +
+      '<div class="modal-sheet">' +
+        '<button class="modal-close" onclick="closeModal()">✕</button>' +
+        '<h3>Foto del ticket</h3>' +
+        '<img class="modal-photo-full" src="'+getPhotoUrl(state.modalPhoto.id)+'">' +
+      '</div></div>';
+  }
+  if(state.confirmTarget){
+    const t = state.index.find(x=>x.id===state.confirmTarget);
+    html += '<div class="modal-overlay" onclick="if(event.target===this) closeModal()">' +
+      '<div class="modal-sheet">' +
+        '<button class="modal-close" onclick="closeModal()">✕</button>' +
+        '<h3>Confirmar recibido</h3>' +
+        (t ? '<div class="ticket-route">' + branchDot(t.from) + escapeHtml(t.from) + ' &rarr; ' + branchDot(t.to) + escapeHtml(t.to) + '</div>' : '') +
+        '<div class="checkbox-row" style="margin-top:14px;">' +
+          '<input type="checkbox" id="diferencia-check" onchange="document.getElementById(\'diferencia-wrap\').style.display=this.checked?\'block\':\'none\'">' +
+          '<label for="diferencia-check">Llegó con diferencias</label>' +
+        '</div>' +
+        '<div id="diferencia-wrap" style="display:none;" class="field">' +
+          '<label>Describe la diferencia</label>' +
+          '<textarea id="diferencia-notas" placeholder="Ej. faltó 1 caja de aceite"></textarea>' +
+        '</div>' +
+        '<div class="modal-actions">' +
+          '<button class="btn-cancel" onclick="closeModal()">Cancelar</button>' +
+          '<button class="btn-confirm" onclick="submitConfirmacion()">Confirmar</button>' +
+        '</div>' +
+      '</div></div>';
+  }
+  if(state.cancelTarget){
+    const t = state.index.find(x=>x.id===state.cancelTarget);
+    html += '<div class="modal-overlay" onclick="if(event.target===this) closeModal()">' +
+      '<div class="modal-sheet">' +
+        '<button class="modal-close" onclick="closeModal()">✕</button>' +
+        '<h3>¿Cancelar traspaso?</h3>' +
+        (t ? '<div class="ticket-route">' + branchDot(t.from) + escapeHtml(t.from) + ' &rarr; ' + branchDot(t.to) + escapeHtml(t.to) + '</div>' : '') +
+        '<p style="font-size:13.5px;color:var(--ink-soft);margin-top:10px;">La sucursal destino ya no podrá confirmarlo. Quedará marcado como cancelado en el historial.</p>' +
+        '<div class="modal-actions">' +
+          '<button class="btn-cancel" onclick="closeModal()">Volver</button>' +
+          '<button class="btn-danger" onclick="submitCancelacion()">Sí, cancelar</button>' +
+        '</div>' +
+      '</div></div>';
+  }
+  if(state.deleteConfirmOpen){
+    html += '<div class="modal-overlay" onclick="if(event.target===this) closeModal()">' +
+      '<div class="modal-sheet">' +
+        '<button class="modal-close" onclick="closeModal()">✕</button>' +
+        '<h3>¿Borrar todo el historial?</h3>' +
+        '<p style="font-size:13.5px;color:var(--ink-soft);">Esto elimina todos los traspasos de las 4 sucursales. No se puede deshacer.</p>' +
+        '<div class="modal-actions">' +
+          '<button class="btn-cancel" onclick="closeModal()">Cancelar</button>' +
+          '<button class="btn-danger" onclick="confirmDeleteAll()">Borrar todo</button>' +
+        '</div>' +
+      '</div></div>';
+  }
+  return html;
+}
+
+function render(){
+  const app = document.getElementById('app');
+  let mainHtml;
+  if(!state.currentBranch){
+    mainHtml = '<div class="gate">Selecciona tu sucursal arriba para comenzar.</div>';
+  }else if(state.activeTab==='nuevo'){
+    mainHtml = renderNuevoTab();
+  }else if(state.activeTab==='recibir'){
+    mainHtml = renderRecibirTab();
+  }else{
+    mainHtml = renderHistorialTab();
+  }
+  app.innerHTML = '<div class="wrap">' +
+    renderHeader() +
+    (state.error ? '<main><div class="banner"><span>'+state.error+'</span><button onclick="refreshData()">Reintentar</button></div></main>' : '') +
+    '<main>' + mainHtml + '</main>' +
+  '</div>' + renderModals();
+}
+
+refreshData();
+</script>
+</body>
+</html>
