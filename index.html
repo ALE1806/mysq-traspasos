@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   :root{
     --bg:#E9EAE4;
@@ -246,6 +247,11 @@
     display:block;text-align:center;margin-top:24px;font-size:11.5px;color:var(--ink-soft);
     text-decoration:underline;background:none;border:none;cursor:pointer;width:100%;
   }
+  .export-btn{
+    margin-top:20px;width:100%;background:var(--paper);border:1.5px solid var(--ink);color:var(--ink);
+    border-radius:9px;padding:12px;font-size:14px;font-weight:600;cursor:pointer;
+  }
+  .export-btn:disabled{opacity:0.5;}
 </style>
 </head>
 <body>
@@ -643,21 +649,58 @@ async function submitConfirmacion(){
   }
 }
 
-async function confirmDeleteAll(){
+async function descargarExcel(){
+  const btn = document.getElementById('export-btn');
+  if(btn){ btn.disabled = true; btn.textContent = 'Generando…'; }
   try{
-    const { data: files } = await sb.storage.from(PHOTO_BUCKET).list();
-    if(files && files.length){
-      await sb.storage.from(PHOTO_BUCKET).remove(files.map(f=>f.name));
-    }
-    const { error } = await sb.from(TABLE).delete().neq('id', '__never_matches__');
-    if(error) throw error;
-    state.index = [];
-    state.deleteConfirmOpen = false;
-    showToast('Historial borrado');
-    render();
+    await loadIndex(); // trae lo más reciente de las 4 sucursales, sin importar filtros activos
+    const rows = state.index;
+    const statusLabels = {pendiente:'Pendiente', confirmado:'Recibido', diferencia:'Diferencia', cancelado:'Cancelado'};
+
+    const detalle = rows.map(t => ({
+      'ID': t.id,
+      'Fecha': fmtDate(t.createdAt),
+      'Sucursal origen': t.from,
+      'Sucursal destino': t.to,
+      'Estado': statusLabels[t.status] || t.status,
+      'Productos': t.items.map(it => it.producto + (it.cantidad ? ' x' + it.cantidad : '')).join(', '),
+      'Notas': t.notas || '',
+      'Creado por': t.createdBy || '',
+      'Confirmado/Cancelado por': t.confirmedBy || t.canceledBy || '',
+      'Fecha confirmación/cancelación': fmtDate(t.confirmedAt || t.canceledAt || ''),
+      'Nota de diferencia': t.confirmNotas || ''
+    }));
+
+    const statusCounts = {pendiente:0, confirmado:0, diferencia:0, cancelado:0};
+    rows.forEach(t => { if(statusCounts[t.status] !== undefined) statusCounts[t.status]++; });
+    const resumenEstado = [
+      {'Estado':'Pendiente', 'Cantidad': statusCounts.pendiente},
+      {'Estado':'Recibido', 'Cantidad': statusCounts.confirmado},
+      {'Estado':'Con diferencia', 'Cantidad': statusCounts.diferencia},
+      {'Estado':'Cancelado', 'Cantidad': statusCounts.cancelado},
+      {'Estado':'Total', 'Cantidad': rows.length}
+    ];
+
+    const porSucursal = BRANCHES.map(b => ({
+      'Sucursal': b,
+      'Traspasos enviados': rows.filter(t=>t.from===b).length,
+      'Traspasos recibidos (como destino)': rows.filter(t=>t.to===b).length,
+      'Pendientes por recibir': rows.filter(t=>t.to===b && t.status==='pendiente').length,
+      'Cancelados (enviados por ella)': rows.filter(t=>t.from===b && t.status==='cancelado').length
+    }));
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(resumenEstado), 'Resumen por estado');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(porSucursal), 'Resumen por sucursal');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(detalle), 'Detalle');
+
+    const fecha = new Date().toISOString().slice(0,10);
+    XLSX.writeFile(wb, 'traspasos-mini-ysq-' + fecha + '.xlsx');
   }catch(e){
-    showToast('No se pudo borrar: ' + (e && e.message ? e.message : ''));
+    console.error('descargarExcel error:', e);
+    showToast('No se pudo generar el Excel: ' + (e && e.message ? e.message : ''));
   }
+  if(btn){ btn.disabled = false; btn.textContent = '📊 Descargar Excel'; }
 }
 
 function setTab(tab){
@@ -811,7 +854,7 @@ function renderHistorialTab(){
     ? '<div class="empty-state">No hay traspasos con ese filtro.</div>'
     : list.map(renderTicket).join('');
   return filters + body +
-    '<button class="footer-link" onclick="state.deleteConfirmOpen=true; render()">Borrar todo el historial (todas las sucursales)</button>';
+    '<button type="button" class="export-btn" id="export-btn" onclick="descargarExcel()">📊 Descargar Excel</button>';
 }
 
 function renderModals(){
@@ -856,18 +899,6 @@ function renderModals(){
         '<div class="modal-actions">' +
           '<button class="btn-cancel" onclick="closeModal()">Volver</button>' +
           '<button class="btn-danger" onclick="submitCancelacion()">Sí, cancelar</button>' +
-        '</div>' +
-      '</div></div>';
-  }
-  if(state.deleteConfirmOpen){
-    html += '<div class="modal-overlay" onclick="if(event.target===this) closeModal()">' +
-      '<div class="modal-sheet">' +
-        '<button class="modal-close" onclick="closeModal()">✕</button>' +
-        '<h3>¿Borrar todo el historial?</h3>' +
-        '<p style="font-size:13.5px;color:var(--ink-soft);">Esto elimina todos los traspasos de las 4 sucursales. No se puede deshacer.</p>' +
-        '<div class="modal-actions">' +
-          '<button class="btn-cancel" onclick="closeModal()">Cancelar</button>' +
-          '<button class="btn-danger" onclick="confirmDeleteAll()">Borrar todo</button>' +
         '</div>' +
       '</div></div>';
   }
